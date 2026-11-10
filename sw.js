@@ -1,6 +1,6 @@
 // Offline-välimuisti: sovellus aukeaa ilman verkkoa, päivitykset haetaan taustalla.
-const CACHE = 'punakyna-v1';
-const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/engine.js', 'js/data.js', 'js/ai.js', 'js/sync.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'punakyna-v2';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'engine.js', 'data.js', 'ai.js', 'sync.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
