@@ -1,0 +1,22 @@
+# Valinnainen: estää Supabasen ilmaisprojektin pausettumisen silloinkin, kun et harjoittele viikkoon.
+# Ota käyttöön lisäämällä repon Settings → Secrets and variables → Actions:
+#   SUPABASE_URL  (esim. https://xxxx.supabase.co)
+#   SUPABASE_KEY  (publishable / anon key)
+# Ilman näitä työ ohitetaan hiljaa.
+name: Supabase keep-alive
+on:
+  schedule:
+    - cron: "17 6 */3 * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping database
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Supabase secrets not set, skipping."; exit 0; fi
+          curl -fsS "$URL/rest/v1/progress?select=updated_at&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" > /dev/null
+          echo "Pinged."
