@@ -26,7 +26,6 @@ const ord = (id, d, tags, fi, text, alt = []) => ({ id, type: 'order', skill: 's
 const fix = (id, d, tags, wrong, ans, ex) => ({ id, type: 'fix', skill: 'sentence', d, tags, wrong, ans, ex });
 const tr = (id, d, tags, fi, ans) => ({ id, type: 'tr', skill: 'sentence', d, tags, fi, ans });
 const wr = (id, d, tags, ctx, title, task, minWords, model) => ({ id, type: 'write', skill: 'writing', d, tags, ctx, title, task, minWords, model });
-const sp = (id, d, tags, ctx, title, prompt, task, model, targetSec = 45) => ({ id, type: 'speak', skill: 'speaking', d, tags, ctx, title, prompt, task, model, targetSec });
 
 export const BANK = [
   // ---------- Kielioppi: monivalinnat ----------
@@ -204,45 +203,11 @@ export const BANK = [
     'Risk: the new control software may not be compatible with the older machines. Probability: medium, because two of the five machines use an older PLC model. Impact: high, as an incompatibility would stop production on those lines. Action: we will test the software on one older machine before the rollout and prepare a rollback plan.'),
   wr('w16', 1100, ['politeness', 'perfect'], 'Sähköposti', 'Muistutus', 'Lähetit viikko sitten sähköpostin, johon ei ole vastattu. Muistuta kohteliaasti.', 40,
     "Hi Daniel, I'm following up on my email from last week about the updated price list. Have you had a chance to look at it? It would help us a lot to get your answer by Friday. Thanks in advance!"),
-
-  // ---------- Puhuminen ----------
-  sp('s01', 1100, ['perfect', 'future'], 'Palaveri', 'Tilannekatsaus', 'Could you give us a quick update on your part of the project?', 'Kerro tilanne: mitä on tehty, mitä on kesken ja mikä estää etenemistä.',
-    "Sure. Last week we finished the first round of testing, and the results look good. We're now updating the documentation, which should be ready by Friday. The only issue is that we're still waiting for two parts from the supplier, so the final test might be delayed by a few days."),
-  sp('s02', 1150, ['politeness', 'future'], 'Puhelu', 'Myöhästynyt tilaus', "Hi, I'm calling about our order. It was supposed to arrive yesterday. What's going on?", 'Pahoittele, selitä syy (kuljetusviive), kerro uusi arvio ja lupaa ilmoittaa.',
-    "I'm really sorry about that. The shipment was delayed by our transport company, so it didn't leave our warehouse on time. It should arrive on Thursday at the latest. I'll keep an eye on it and let you know as soon as it's on its way."),
-  sp('s03', 1250, ['politeness', 'conditionals'], 'Palaveri', 'Eri mieltä olemista', 'So, do we all agree to go with option A?', 'Olet eri mieltä. Sano se kohteliaasti, perustele ja ehdota vaihtoehtoa B.',
-    "I see why option A looks attractive, but I'm not sure it's the best choice. It would take longer to implement, and we already have tight deadlines. Could we consider option B instead? I think it would reduce the risk."),
-  sp('s04', 1000, ['articles', 'perfect'], 'Palaveri', 'Esittäytyminen', 'Welcome to the team! Could you tell us a bit about yourself?', 'Esittäydy: tausta, rooli ja mitä odotat uudelta työltä.',
-    "Thank you! My name is …, and I've just joined the team as a … Before this, I worked for … years in …, mostly with … I'm looking forward to working with all of you and learning how things are done here."),
-  sp('s05', 1050, ['questions'], 'Palaveri', 'Tarkentava kysymys', 'Does anyone have any questions?', 'Kysy tarkentava kysymys aikataulusta ja resursseista.',
-    'Yes, I have one question. Do we have enough people to keep this schedule? Last time we had to postpone the testing because some of the team were working on other projects.'),
-  sp('s06', 1250, ['articles', 'linking'], 'Puhelu', 'Selitä maallikolle', "Can you explain how the new system works? I'm not very technical.", 'Selitä yksinkertaisesti jokin työsi laite tai järjestelmä.',
-    'Of course. Basically, the system measures the temperature in each machine and sends the data to a computer. If the temperature gets too high, it gives an alarm, so we can stop the machine before anything breaks.'),
-  sp('s07', 1200, ['passive', 'perfect'], 'Palaveri', 'Miksi testi epäonnistui', 'Why did the test fail last week?', 'Selitä syy ja mitä on tehty, ettei sama toistu.',
-    "The test failed because one of the sensors gave incorrect readings. It turned out that it hadn't been calibrated after the last service. We've now calibrated all the sensors and added the calibration to our checklist, so it shouldn't happen again."),
-  sp('s08', 950, ['questions'], 'Small talk', 'Viikonloppu', 'How was your weekend?', 'Kerro viikonlopustasi 3–4 lauseella ja kysy takaisin.',
-    'It was nice, thanks. I went to our summer cottage on Saturday and did some work in the yard. On Sunday I just relaxed at home. How about you? Did you do anything special?', 30),
-  sp('s09', 1350, ['politeness', 'conditionals'], 'Puhelu', 'Neuvottelu', "I'm afraid we need the delivery two weeks earlier. Is that possible?", 'Koko tilauksen aikaistus ei onnistu. Tarjoa osatoimitusta.',
-    "I understand the situation, but I'm afraid we can't deliver the whole order two weeks earlier. What we could do is send part of it, about half, next week, and the rest on the original date. Would that help you?"),
-  sp('s10', 1200, ['modal', 'linking'], 'Palaveri', 'Suositus', 'What would you recommend we do next?', 'Anna suositus ja kaksi perustelua.',
-    "I'd recommend that we run a small pilot first. That way we can test the solution in real conditions without risking the whole production, and we'll have actual data to support the final decision."),
-  sp('s11', 1150, ['future'], 'Palaveri', 'Sano toisin', "Sorry, I didn't quite get that. Could you say it again in other words?", 'Selitä toisin sanoin: aikataulu on muuttunut, uusi deadline on 15.12. koska toimittaja tarvitsee lisäaikaa.',
-    'Sure, sorry. What I meant is that the schedule has changed. The new deadline is the fifteenth of December instead of the first, because the supplier needs more time.', 30),
-  sp('s12', 1300, ['modal', 'linking'], 'Puhelu', 'Ohjeista puhelimessa', 'The machine stopped and shows error code E17. What should I do?', 'Ohjeista vaihe vaiheelta: pysäytys, tarkistus, uudelleenkäynnistys, mitä tehdä jos vika jatkuu.',
-    "Okay, don't worry. First, press the red stop button and make sure the machine has completely stopped. Then open the control panel and check if any of the fuses has tripped. If everything looks okay, restart the machine. If the error comes back, call me again and I'll come over.", 60),
-  sp('s13', 1200, ['politeness'], 'Palaveri', 'Keskeytä kohteliaasti', "…and that's why we think the budget is fine. Moving on to the next topic —", 'Keskeytä kohteliaasti ja tuo esiin unohtunut asia: lisätestauksen kustannukset.',
-    "Sorry to interrupt, but before we move on, could I add one thing? We haven't discussed the cost of the extra testing yet, and it might affect the budget.", 30),
-  sp('s14', 1300, ['politeness'], 'Palaveri', 'Palaute', 'What did you think of my presentation?', 'Anna rakentavaa palautetta: yksi vahvuus ja yksi parannettava asia.',
-    'I thought it was really clear, especially the part where you showed the test results. One thing you could improve is the timing: the introduction was quite long, so you had to rush through the conclusions.'),
-  sp('s15', 1250, ['future'], 'Palaveri', 'Yhteenveto', "Okay, I think that's all for today.", 'Tee palaverista yhteenveto ja kerro seuraavat askeleet.',
-    "Okay, let me sum up. We agreed to go with supplier B, Laura will prepare the test plan, and I'll update the documentation. We'll meet again next Tuesday to check the progress."),
-  sp('s16', 1050, ['politeness'], 'Puhelu', 'Huono hetki', 'Hello, this is Mark from Nordic Parts. Is this a good time to talk?', 'Nyt ei sovi. Ehdota uutta aikaa ja kysy lyhyesti, mistä on kyse.',
-    "Hi Mark, thanks for calling. Unfortunately, I'm in a meeting right now. Could I call you back at around three? Or is it something urgent?", 30),
 ];
 
 // Lähtötason itsearviointi (monivalinnat) → painottaa alkuarvoja ennen testiä
 export const SELF_ASSESS = [
-  { q: 'Kun kollega kysyy palaverissa jotain englanniksi, miten vastaat?', skill: 'speaking',
+  { q: 'Kun kollega kysyy palaverissa jotain englanniksi, miten vastaat?', skill: 'fluency',
     opts: [['Vältän vastaamista tai vastaan muutamalla sanalla', -150], ['Vastaan, mutta mietin lauseita pitkään', -50], ['Vastaan sujuvasti, joskus haen sanoja', 50], ['Vastaan vaivatta', 150]] },
   { q: 'Kauanko 5 lauseen työsähköpostin kirjoittaminen englanniksi vie?', skill: 'writing',
     opts: [['Yli 20 min tai käytän kääntäjää', -150], ['10–20 min', -50], ['5–10 min', 50], ['Alle 5 min', 150]] },

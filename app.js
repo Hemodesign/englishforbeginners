@@ -27,7 +27,7 @@ function save() {
 function saveSettings(patch) { settings = { ...settings, ...patch }; localStorage.setItem(LS_SET, JSON.stringify(settings)); }
 function refresh() { D = E.derive(state); }
 function aiCtx() {
-  return { workDesc: state.profile.workDesc, level: `${D.overallCefr.label} (writing ${D.sk.writing.cefr.label}, speaking ${D.sk.speaking.cefr.label})`, goal: state.profile.goal, weak: D.weakTags.slice(0, 4).map(t => t.tag).join(', ') };
+  return { workDesc: state.profile.workDesc, level: `${D.overallCefr.label} (writing ${D.sk.writing.cefr.label})`, goal: state.profile.goal, weak: D.weakTags.slice(0, 4).map(t => t.tag).join(', ') };
 }
 
 // ---------- Apurit ----------
@@ -37,9 +37,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const main = () => $('#main');
 const words = s => (s.trim().match(/[A-Za-z0-9'’-]+/g) || []).length;
 const fmtDate = t => new Date(t).toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' });
-const TYPE = { mcq: 'Monivalinta', order: 'Sanajärjestys', fix: 'Korjaa virhe', tr: 'Käännä', write: 'Kirjoita', speak: 'Puhu' };
+const TYPE = { mcq: 'Monivalinta', order: 'Sanajärjestys', fix: 'Korjaa virhe', tr: 'Käännä', write: 'Kirjoita' };
 function itemTitle(it) {
-  if (it.type === 'write' || it.type === 'speak') return `${it.title} (${it.ctx})`;
+  if (it.type === 'write') return `${it.title} (${it.ctx})`;
   if (it.personal) return 'Oma aiempi virhe';
   return TAGS[it.tags?.[0]] || TYPE[it.type];
 }
@@ -51,8 +51,7 @@ function every(ms, fn) { const id = setInterval(fn, ms); cleanups.push(() => cle
 function onLeave(fn) { cleanups.push(fn); }
 const arrow = v => v > 3 ? `<span class="up">▲ +${v}</span>` : v < -3 ? `<span class="down">▼ ${v}</span>` : `<span class="flat">● ${v >= 0 ? '+' : ''}${v}</span>`;
 
-// ---------- Puhe ----------
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// ---------- Kuuntelu (ääneen luku) ----------
 const hasTTS = 'speechSynthesis' in window;
 function voice() {
   const vs = speechSynthesis.getVoices().filter(v => v.lang?.startsWith('en'));
@@ -66,27 +65,6 @@ function say(text, rate = 0.95) {
   speechSynthesis.speak(u);
 }
 if (hasTTS) speechSynthesis.onvoiceschanged = () => { };
-
-function createRecorder(onUpdate) {
-  const r = new SR();
-  r.lang = settings.srLang; r.continuous = true; r.interimResults = true;
-  let finalText = '', active = false;
-  r.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t.trim() + ' '; else interim += t;
-    }
-    onUpdate(finalText, interim);
-  };
-  r.onend = () => { if (active) { try { r.start(); } catch { } } };
-  r.onerror = e => { if (e.error === 'not-allowed') { active = false; toast('Mikrofonin käyttö estetty. Salli mikrofoni selaimen asetuksista.', true); } };
-  return {
-    start() { active = true; finalText = ''; r.start(); },
-    stop() { active = false; try { r.stop(); } catch { } return finalText.trim(); },
-    get text() { return finalText.trim(); },
-  };
-}
 
 // ---------- Reititys ----------
 const routes = { today: viewToday, practice: viewPractice, progress: viewProgress, settings: viewSettings, test: viewTest, run: viewRun, review: viewReview };
@@ -112,20 +90,20 @@ function renderHeader() {
 
 // ---------- Tänään ----------
 function ensurePlan() {
-  if (!state.plan || state.plan.date !== E.dayKey() || !state.plan.ids?.length) { state.plan = E.buildPlan(state, D); save(); }
+  if (!state.plan || state.plan.date !== E.dayKey() || !state.plan.ids?.length || state.plan.ids.some(id => !E.findItem(state, D, id))) { state.plan = E.buildPlan(state, D); save(); }
 }
 function viewToday() {
   if (!D.placementDone) {
     main().innerHTML = `
       <section class="page">
         <h1>Aloitetaan lähtötasosta</h1>
-        <p class="lead">Punakynä mittaa ensin, missä olet: viisi kysymystä itsestäsi ja noin 15 minuutin adaptiivinen testi. Testi vaikeutuu kun vastaat oikein ja helpottuu kun vastaat väärin, joten se löytää tasosi nopeasti.</p>
+        <p class="lead">Punakynä mittaa ensin, missä olet: viisi kysymystä itsestäsi ja noin 12 minuutin adaptiivinen testi. Testi vaikeutuu kun vastaat oikein ja helpottuu kun vastaat väärin, joten se löytää tasosi nopeasti.</p>
         <ol class="steps">
           <li>Itsearvio: 5 monivalintaa</li>
           <li>12 lyhyttä tehtävää: kielioppi, lauseenmuodostus, käännökset</li>
-          <li>Yksi työsähköposti ja yksi puhuttu vastaus</li>
+          <li>Yksi työsähköposti</li>
         </ol>
-        ${AI.aiReady(settings) ? '' : `<p class="note">Kirjoitus ja puhe arvioidaan tarkimmin tekoälyllä. Lisää ilmainen Gemini-avain <a href="#/settings">asetuksissa</a> ennen testiä – ilman sitä arvioit tekstisi itse mallivastausta vasten.</p>`}
+        ${AI.aiReady(settings) ? '' : `<p class="note">Kirjoitus arvioidaan tarkimmin tekoälyllä. Lisää ilmainen Gemini-avain <a href="#/settings">asetuksissa</a> ennen testiä – ilman sitä arvioit tekstisi itse mallivastausta vasten.</p>`}
         <div class="actions"><button class="btn primary" id="go-test">Aloita lähtötasotesti</button></div>
       </section>`;
     $('#go-test').onclick = () => go('#/test');
@@ -153,7 +131,7 @@ function viewToday() {
           <span class="check" aria-hidden="true"></span>
           <span class="pt">${TYPE[it.type]}</span>
           <span class="pn">${esc(itemTitle(it))}</span>
-          ${it.type === 'write' || it.type === 'speak' ? '<span class="must">pakollinen</span>' : ''}
+          ${it.type === 'write' ? '<span class="must">pakollinen</span>' : ''}
         </li>`).join('')}
       </ul>
       <div class="actions">
@@ -186,7 +164,6 @@ function viewPractice() {
     ['fix', 'Korjaa virhe', 'Suomalaisten tyypilliset virheet'],
     ['tr', 'Käännä', 'Suomesta englanniksi, ajastettu'],
     ['write', 'Kirjoita', 'Sähköposti, Teams-viesti tai dokumentti'],
-    ['speak', 'Puhu', 'Palaveri- ja puhelutilanteet'],
     ['gen', 'Tekoälyn uudet tehtävät', AI.aiReady(settings) ? `${freshGen.length} valmiina heikkouksiesi pohjalta` : 'Vaatii tekoälyavaimen', !freshGen.length && !AI.aiReady(settings)],
   ];
   if (!D.placementDone || (D.testDue && D.testOverdueDays > 3)) { viewToday(); return; }
@@ -202,8 +179,8 @@ function viewPractice() {
       if (!ids.length) return toast('Tehtävien luonti epäonnistui. Tarkista tekoälyasetukset.', true);
       return startSession(ids, 'free');
     }
-    const n = k === 'write' || k === 'speak' ? 1 : 6;
-    const skill = { mcq: 'grammar', write: 'writing', speak: 'speaking' }[k] || 'sentence';
+    const n = k === 'write' ? 1 : 6;
+    const skill = { mcq: 'grammar', write: 'writing' }[k] || 'sentence';
     const used = new Set(), ids = [];
     for (let i = 0; i < n; i++) { const it = E.pick(state, D, [k], skill, used); if (it) { used.add(it.id); ids.push(it.id); } }
     startSession(ids, 'free');
@@ -226,7 +203,7 @@ function recordAttempt(item, res) {
   };
   if (res.text) a.text = res.text.slice(0, 3000);
   if (res.fb) a.fb = res.fb;
-  if (item.type === 'write' || item.type === 'speak') a.title = item.title;
+  if (item.type === 'write') a.title = item.title;
   state.attempts.push(a);
   if (session?.mode === 'plan' && state.plan && !state.plan.done.includes(item.id)) state.plan.done.push(item.id);
   save(); refresh();
@@ -334,7 +311,6 @@ const RENDER = {
   fix(item, cx, root) { openAnswer(item, cx, root); },
   tr(item, cx, root) { openAnswer(item, cx, root); },
   write: renderWrite,
-  speak: renderSpeak,
 };
 
 // Avoin lyhyt vastaus (korjaa / käännä)
@@ -343,22 +319,12 @@ function openAnswer(item, cx, root) {
   const isTr = item.type === 'tr';
   root.innerHTML = `
     ${isTr ? `<p class="prompt fi">${esc(item.fi)}</p>` : `<p class="hint">Korjaa lause. ${item.personal ? 'Tämä on sinun oma aiempi virheesi.' : ''}</p><p class="prompt en wrongline">${esc(item.wrong)}</p>`}
-    <div class="field"><textarea id="ans" class="en" rows="3" autocomplete="off" autocapitalize="sentences" spellcheck="false" placeholder="${isTr ? 'Kirjoita englanniksi…' : ''}">${isTr ? '' : esc(item.wrong)}</textarea>
-      ${SR ? '<button class="mic" id="mic" title="Sano vastaus ääneen" aria-label="Sano vastaus ääneen">Puhu</button>' : ''}</div>
+    <div class="field"><textarea id="ans" class="en" rows="3" autocomplete="off" autocapitalize="sentences" spellcheck="false" placeholder="${isTr ? 'Kirjoita englanniksi…' : ''}">${isTr ? '' : esc(item.wrong)}</textarea></div>
     ${isTr ? '<p class="timer" id="tm"></p>' : ''}
     <div class="fb"></div><div class="actions"><button class="btn primary" id="chk">Tarkista</button></div>`;
   const ta = $('#ans'); ta.focus();
   if (!isTr) ta.setSelectionRange(ta.value.length, ta.value.length);
   if (isTr) every(500, () => { const s = Math.round((Date.now() - t0) / 1000); $('#tm').textContent = `${s} s`; $('#tm').classList.toggle('slow', s > 45); });
-  if (SR) {
-    let rec = null;
-    $('#mic').onclick = () => {
-      if (rec) { rec.stop(); rec = null; $('#mic').classList.remove('rec'); return; }
-      rec = createRecorder((f, i) => { ta.value = (f + i).trim(); });
-      rec.start(); $('#mic').classList.add('rec');
-      onLeave(() => rec?.stop());
-    };
-  }
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#chk').click(); } });
   $('#chk').onclick = async () => {
     const answer = ta.value.trim();
@@ -430,63 +396,7 @@ function renderWrite(item, cx, root) {
   };
 }
 
-function renderSpeak(item, cx, root) {
-  const t0 = Date.now();
-  root.innerHTML = `
-    <p class="task">${esc(item.task)}</p>
-    <div class="quote">
-      ${hasTTS ? `<button class="btn" id="listen">Kuuntele</button> <button class="link" id="show">Näytä teksti</button><p id="ptxt" class="en" hidden>“${esc(item.prompt)}”</p>` : `<p class="en">“${esc(item.prompt)}”</p>`}
-    </div>
-    <p class="hint">${SR ? `Vastaa ääneen noin ${item.targetSec} sekuntia. Puhu niin kuin palaverissa: älä kirjoita ensin.` : `Tämä selain ei tunnista puhetta (toimii Chromessa ja Safarissa). Sano vastaus ääneen ja kirjoita se sitten heti – aikaa ${item.targetSec + 30} s.`}</p>
-    <div id="rec-area"></div>
-    <div class="fb"></div><div class="actions"></div>`;
-  if (hasTTS) {
-    $('#listen').onclick = () => say(item.prompt);
-    $('#show').onclick = () => { $('#ptxt').hidden = false; $('#show').remove(); };
-    setTimeout(() => say(item.prompt), 400);
-  }
-  const area = $('#rec-area');
-  if (SR) {
-    area.innerHTML = `<button class="rec-btn" id="rec"><span>Aloita puhuminen</span></button><p class="live en" id="live"></p><p class="timer" id="tm"></p>`;
-    let rec = null, start = 0, maxT = null;
-    const stop = () => {
-      if (!rec) return; const text = rec.stop(); rec = null; clearTimeout(maxT);
-      const secs = (Date.now() - start) / 1000;
-      $('#rec').disabled = true; $('#rec').classList.remove('on'); $('#rec span').textContent = 'Tallennettu';
-      if (words(text) < 5) { $('#live').textContent = 'Puhetta ei tunnistettu riittävästi. Yritä uudelleen lähempänä mikrofonia.'; $('#rec').disabled = false; $('#rec span').textContent = 'Yritä uudelleen'; return; }
-      const wpm = words(text) / (secs / 60);
-      openFeedback(item, cx, root, text, Date.now() - t0, { wpm, secs }, () => AI.evalSpeaking(settings, aiCtx(), item, text, secs));
-    };
-    $('#rec').onclick = () => {
-      if (rec) return stop();
-      if (hasTTS) speechSynthesis.cancel();
-      rec = createRecorder((f, i) => { $('#live').innerHTML = `${esc(f)}<span class="interim">${esc(i)}</span>`; });
-      rec.start(); start = Date.now();
-      $('#rec').classList.add('on'); $('#rec span').textContent = 'Lopeta';
-      maxT = setTimeout(stop, item.targetSec * 2000);
-      every(250, () => { if (!rec) return; const s = Math.round((Date.now() - start) / 1000); $('#tm').textContent = `${s} s / ${item.targetSec} s`; $('#tm').classList.toggle('slow', s > item.targetSec * 1.5); });
-      onLeave(() => rec?.stop());
-    };
-  } else {
-    const limit = item.targetSec + 30;
-    area.innerHTML = `<button class="btn primary" id="go">Aloita (${limit} s)</button>`;
-    $('#go').onclick = () => {
-      const start = Date.now();
-      area.innerHTML = `<textarea id="txt" class="en big" rows="6" spellcheck="false"></textarea><p class="timer" id="tm"></p>`;
-      $('#txt').focus();
-      const done = () => {
-        const text = $('#txt').value.trim(); $('#txt').readOnly = true;
-        const secs = (Date.now() - start) / 1000;
-        if (!text) { cx.submit({ score: 0, ms: Date.now() - t0 }); return cx.test ? cx.next() : nextBtn(cx, $('.actions', root)); }
-        openFeedback(item, cx, root, text, Date.now() - t0, { secs }, () => AI.evalSpeaking(settings, aiCtx(), item, text, secs));
-      };
-      const tmr = setInterval(() => { const left = limit - Math.round((Date.now() - start) / 1000); $('#tm').textContent = `${left} s`; if (left <= 0) { clearInterval(tmr); done(); } }, 250);
-      onLeave(() => clearInterval(tmr));
-    };
-  }
-}
-
-// Kirjoitus/puhe: tekoälyarvio punakynällä, tai mallivastaus + itsearvio
+// Kirjoitus: tekoälyarvio punakynällä, tai mallivastaus + itsearvio
 async function openFeedback(item, cx, root, text, ms, extra, evalFn) {
   const fbEl = $('.fb', root), act = $('.actions', root);
   if (AI.aiReady(settings)) {
@@ -496,7 +406,7 @@ async function openFeedback(item, cx, root, text, ms, extra, evalFn) {
       const score = Math.max(0, Math.min(100, Number(fb.score) || 0)) / 100;
       const grammarScore = fb.sub?.grammar != null ? fb.sub.grammar / 100 : null;
       const cefrRating = E.CEFR_MID[fb.cefr] || null;
-      const clean = { score: fb.score, cefr: fb.cefr, sub: fb.sub, errors: (fb.errors || []).slice(0, 8), improved: fb.improved, tip: fb.tip, secs: extra.secs, wpm: extra.wpm ? Math.round(extra.wpm) : undefined };
+      const clean = { score: fb.score, cefr: fb.cefr, sub: fb.sub, errors: (fb.errors || []).slice(0, 8), improved: fb.improved, tip: fb.tip };
       cx.submit({ score, ms, text, fb: clean, extra: { ...extra, grammarScore, cefrRating } });
       fbEl.innerHTML = feedbackHTML(text, clean, item);
       bindFeedback(fbEl, clean, item);
@@ -505,7 +415,7 @@ async function openFeedback(item, cx, root, text, ms, extra, evalFn) {
     } catch (e) { toast(e.message, true); }
   }
   fbEl.innerHTML = `
-    <div class="model"><h3>Mallivastaus</h3><p class="en pre">${esc(item.model)}</p>${hasTTS ? '<button class="btn" id="lm">Kuuntele ja toista ääneen</button>' : ''}</div>
+    <div class="model"><h3>Mallivastaus</h3><p class="en pre">${esc(item.model)}</p>${hasTTS ? '<button class="btn" id="lm">Kuuntele</button>' : ''}</div>
     <p class="hint">Vertaa omaasi malliin. Mikä kuvaus vastaa vastaustasi parhaiten?</p>
     <div class="opts">${SELF_LEVELS.map(([t], i) => `<button class="opt" data-i="${i}">${esc(t)}</button>`).join('')}</div>`;
   $('#lm')?.addEventListener('click', () => say(item.model, 0.9));
@@ -545,11 +455,10 @@ function feedbackHTML(text, fb, item) {
       <div class="cefr-tag" title="Tämän tekstin taso">${esc(fb.cefr || '')}</div>
       <div class="subs">${Object.entries(subNames).filter(([k]) => sub[k] != null).map(([k, n]) => `<div class="sub"><span>${n}</span><i><b style="width:${sub[k]}%"></b></i><em>${sub[k]}</em></div>`).join('')}</div>
     </div>
-    ${fb.wpm ? `<p class="hint">Puhenopeus ${fb.wpm} sanaa/min${fb.wpm < 90 ? ' – tavoite on yli 100. Puhu ennemmin yksinkertaisesti ja sujuvasti kuin täydellisesti.' : ''}</p>` : ''}
     <div class="paper en">${redPen(text, fb.errors || [])}</div>
     ${fb.errors?.length ? `<ol class="errs">${fb.errors.map(e => `<li><span class="en"><del>${esc(e.orig)}</del> → <ins>${esc(e.fix)}</ins></span><span class="why">${esc(e.why || '')}${e.tag && TAGS[e.tag] ? ` <em>${TAGS[e.tag]}</em>` : ''}</span></li>`).join('')}</ol><p class="hint">Virheet lisätään kertausjonoosi omiksi tehtävikseen.</p>` : '<p class="hint">Ei kielivirheitä.</p>'}
     ${fb.tip ? `<p class="tip"><strong>Seuraavaksi:</strong> ${esc(fb.tip)}</p>` : ''}
-    ${fb.improved ? `<div class="model"><h3>Luontevampi versio</h3><p class="en pre">${esc(fb.improved)}</p>${hasTTS ? '<button class="btn" id="li">Kuuntele ja toista ääneen</button>' : ''}</div>` : ''}
+    ${fb.improved ? `<div class="model"><h3>Luontevampi versio</h3><p class="en pre">${esc(fb.improved)}</p>${hasTTS ? '<button class="btn" id="li">Kuuntele</button>' : ''}</div>` : ''}
     ${item?.model ? `<details class="model"><summary>Mallivastaus</summary><p class="en pre">${esc(item.model)}</p></details>` : ''}`;
 }
 function bindFeedback(el, fb) { $('#li', el)?.addEventListener('click', () => say(fb.improved, 0.9)); }
@@ -597,7 +506,7 @@ function viewTest() {
     return;
   }
   main().innerHTML = `<section class="page"><h1>Tasotesti</h1>
-    <p class="lead">14 tehtävää, noin 15 minuuttia. Testissä ei näytetä oikeita vastauksia kesken testin, ja kirjoitus- ja puhetehtävä arvioidaan lopuksi. Tulos painaa tasoarviossa enemmän kuin tavallinen harjoittelu.</p>
+    <p class="lead">13 tehtävää, noin 12 minuuttia. Testissä ei näytetä oikeita vastauksia kesken testin, ja kirjoitustehtävä arvioidaan lopuksi. Tulos painaa tasoarviossa enemmän kuin tavallinen harjoittelu.</p>
     <p>Edellinen testi: ${D.lastTest ? fmtDate(D.lastTest.t) : '–'}</p>
     <div class="actions"><button class="btn primary" id="begin">Aloita testi</button></div></section>`;
   $('#begin').onclick = () => { session = { test: E.createTest(state, D, false), i: 0, results: [], before: snapshot() }; go('#/run'); };
@@ -625,12 +534,12 @@ function finishTestView() {
 // ---------- Edistyminen ----------
 function analysisSentence() {
   const s = D.sk;
-  const prod = Math.round((s.writing.r + s.speaking.r) / 2);
+  const prod = s.writing.r;
   const recep = Math.round((s.grammar.r + s.sentence.r) / 2);
   const parts = [];
   const sorted = Object.entries(s).sort((a, b) => b[1].r - a[1].r);
   parts.push(`Vahvin: ${E.SKILLS[sorted[0][0]].toLowerCase()} (${sorted[0][1].cefr.label}), heikoin: ${E.SKILLS[sorted.at(-1)[0]].toLowerCase()} (${sorted.at(-1)[1].cefr.label}).`);
-  if (recep - prod > 70) parts.push(`Kielitieto on ${recep - prod} pistettä tuottamista edellä: säännöt ovat tiedossa, mutta niiden käyttö omassa tekstissä ja puheessa on vielä hidasta. Painotus pysyy kirjoittamisessa ja puhumisessa.`);
+  if (recep - prod > 70) parts.push(`Kielitieto on ${recep - prod} pistettä tuottamista edellä: säännöt ovat tiedossa, mutta niiden käyttö omassa tekstissä on vielä hidasta. Painotus pysyy kirjoittamisessa.`);
   return parts.join(' ');
 }
 
@@ -639,7 +548,7 @@ function trendSentence() {
   const ts = Object.values(D.sk).map(x => x.trend);
   const avg = Math.round(ts.reduce((a, b) => a + b, 0) / ts.length);
   const goal = state.profile.goal;
-  const weakest = Object.entries(D.sk).filter(([k]) => k === 'writing' || k === 'speaking').sort((a, b) => a[1].r - b[1].r)[0];
+  const weakest = ['writing', D.sk.writing];
   const e = E.eta(weakest[1], goal);
   let txt = avg > 3 ? `Suunta on nouseva, keskimäärin +${avg} pistettä viikossa.` : avg < -3 ? `Suunta on laskeva (${avg} / vko). Järjestelmä painottaa heikentyneitä taitoja.` : 'Taso on pysynyt viimeiset neljä viikkoa ennallaan.';
   if (e.reached) txt += ` ${E.SKILLS[weakest[0]]} on jo tavoitetasolla ${goal}.`;
@@ -672,7 +581,7 @@ function viewProgress() {
       ${[...state.tests].reverse().map(t => `<tr><td>${fmtDate(t.t)}${t.placement ? ' (lähtö)' : ''}</td>${Object.keys(E.SKILLS).map(k => `<td>${t.est?.[k] ? E.cefr(t.est[k]).label : '–'}</td>`).join('')}</tr>`).join('')}
     </tbody></table>
 
-    <h2>Tekstisi ja puheesi</h2>
+    <h2>Tekstisi</h2>
     ${writings.length ? `<ul class="list">${writings.map(a => `<li><a href="#/review/${a.id}"><span>${fmtDate(a.t)} ${a.type === 'speak' ? 'Puhe' : 'Teksti'}: ${esc(a.title || '')}</span><span class="muted">${a.fb?.score != null ? a.fb.score + '/100' : Math.round(a.score * 100) + ' %'}</span></a></li>`).join('')}</ul>` : '<p class="hint">Ei vielä kirjoituksia.</p>'}
   </section>`;
   $$('.chart').forEach(el => drawChart(el, D.sk[el.dataset.k].hist));
@@ -737,7 +646,7 @@ function viewSettings() {
     <div class="field-row"><label>Tavoitetaso</label><div class="seg" data-f="goal">${['B1', 'B2', 'C1'].map(g => `<button class="${p.goal === g ? 'on' : ''}" data-v="${g}">${g}</button>`).join('')}</div></div>
     <div class="field-row"><label>Päivittäinen harjoitus</label><div class="seg" data-f="minutes">${[10, 15, 25].map(m => `<button class="${p.minutes === m ? 'on' : ''}" data-v="${m}">${m} min</button>`).join('')}</div></div>
     <div class="field-row"><label for="wd">Työsi kuvaus tekoälylle</label><textarea id="wd" rows="3">${esc(p.workDesc)}</textarea></div>
-    <div class="field-row"><label>Puheen kieli</label><div class="seg" data-f="srLang">${[['en-US', 'Amerikanenglanti'], ['en-GB', 'Brittienglanti']].map(([v, n]) => `<button class="${st.srLang === v ? 'on' : ''}" data-v="${v}">${n}</button>`).join('')}</div></div>
+    <div class="field-row"><label>Kuunteluääni</label><div class="seg" data-f="srLang">${[['en-US', 'Amerikanenglanti'], ['en-GB', 'Brittienglanti']].map(([v, n]) => `<button class="${st.srLang === v ? 'on' : ''}" data-v="${v}">${n}</button>`).join('')}</div></div>
 
     <h2>Tekoäly</h2>
     <p class="hint">Ilmainen vaihtoehto: Google Gemini. Hae avain osoitteesta aistudio.google.com → Get API key. Avain tallennetaan vain tälle laitteelle. Huom: ilmaisversiossa Google voi käyttää syötteitä tuotekehitykseen, joten älä kirjoita tehtäviin luottamuksellisia työtietoja.</p>

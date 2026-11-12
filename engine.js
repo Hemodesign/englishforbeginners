@@ -6,11 +6,10 @@ export const SKILLS = {
   grammar: 'Kielioppi',
   sentence: 'Lauseenmuodostus',
   writing: 'Kirjoittaminen',
-  speaking: 'Puhuminen',
   fluency: 'Sujuvuus',
 };
 // Lähtöoletus: ymmärtäminen hyvä, tuottaminen hitaampaa
-export const PRIOR = { grammar: 1150, sentence: 1100, writing: 1050, speaking: 1050, fluency: 1000 };
+export const PRIOR = { grammar: 1150, sentence: 1100, writing: 1050, fluency: 1000 };
 export const BANDS = [
   { l: 'A2', min: 0, max: 1000 }, { l: 'B1', min: 1000, max: 1200 }, { l: 'B2', min: 1200, max: 1400 },
   { l: 'C1', min: 1400, max: 1600 }, { l: 'C2', min: 1600, max: 1800 },
@@ -144,7 +143,7 @@ export function derive(state) {
   const testDue = !lastTest || daysSinceTest >= TEST_INTERVAL_DAYS || attemptsSinceTest >= 90;
   const testOverdueDays = lastTest ? Math.max(0, daysSinceTest - TEST_INTERVAL_DAYS) : 0;
 
-  const overall = Math.round(0.15 * sk.grammar.r + 0.2 * sk.sentence.r + 0.25 * sk.writing.r + 0.25 * sk.speaking.r + 0.15 * sk.fluency.r);
+  const overall = Math.round(0.2 * sk.grammar.r + 0.25 * sk.sentence.r + 0.35 * sk.writing.r + 0.2 * sk.fluency.r);
   const todayAttempts = state.attempts.filter(a => dayKey(a.t) === dayKey());
   const todayMinutes = Math.round(todayAttempts.reduce((m, a) => m + (a.ms || 0), 0) / 60000);
 
@@ -185,7 +184,7 @@ function needs(D, goal) {
     const S = D.sk[s];
     let x = clamp((target - S.r) / 200 + 0.4, 0.25, 2.5);
     if (S.trend < -5) x *= 1.35;
-    if (s === 'writing' || s === 'speaking') x *= 1.3;
+    if (s === 'writing') x *= 1.3;
     w[s] = x;
   }
   return w;
@@ -236,18 +235,17 @@ export function buildPlan(state, D) {
   add(pick(state, D, ['mcq'], 'grammar', used));
   // 3) Joustavat paikat tarpeen mukaan
   const w = needs(D, state.profile.goal);
-  const typeFor = { grammar: ['mcq'], sentence: ['order', 'fix', 'tr'], fluency: ['tr', 'order'], writing: ['tr', 'fix'], speaking: ['tr', 'order'] };
-  const skillFor = { grammar: 'grammar', sentence: 'sentence', fluency: 'sentence', writing: 'sentence', speaking: 'sentence' };
+  const typeFor = { grammar: ['mcq'], sentence: ['order', 'fix', 'tr'], fluency: ['tr', 'order'], writing: ['tr', 'fix'] };
+  const skillFor = { grammar: 'grammar', sentence: 'sentence', fluency: 'sentence', writing: 'sentence' };
   const total = Object.values(w).reduce((a, b) => a + b, 0);
   for (let i = 0; i < flexSlots; i++) {
     let r = Math.random() * total, s = 'sentence';
     for (const k in w) { r -= w[k]; if (r <= 0) { s = k; break; } }
     add(pick(state, D, typeFor[s], skillFor[s], used));
   }
-  // 4) Pakolliset: yksi kirjoitus ja yksi puhe joka päivä
+  // 4) Pakollinen: vähintään yksi kirjoitustehtävä joka päivä
   add(pick(state, D, ['write'], 'writing', used));
   if (minutes >= 25) add(pick(state, D, ['write'], 'writing', used));
-  add(pick(state, D, ['speak'], 'speaking', used));
   return { date: dayKey(), ids, done: [] };
 }
 
@@ -269,10 +267,7 @@ export function updatesFor(item, score, ms, extra = {}) {
   if (item.type === 'write' && extra.wpmWriting != null) {
     u.push({ s: 'fluency', d: item.d, score: clamp((extra.wpmWriting - 6) / 14, 0, 1) });
   }
-  if (item.type === 'speak' && extra.wpm != null) {
-    u.push({ s: 'fluency', d: item.d, score: clamp((extra.wpm - 60) / 70, 0, 1) });
-  }
-  if ((item.type === 'write' || item.type === 'speak') && extra.grammarScore != null) {
+  if (item.type === 'write' && extra.grammarScore != null) {
     u.push({ s: 'grammar', d: item.d, score: extra.grammarScore });
   }
   return u;
@@ -282,7 +277,7 @@ export function updatesFor(item, score, ms, extra = {}) {
 export function createTest(state, D, placement, priorAdj = {}) {
   const th = {};
   for (const s in PRIOR) th[s] = (placement ? PRIOR[s] + (priorAdj[s] || 0) : D.sk[s].r);
-  const plan = ['grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'write', 'speak'];
+  const plan = ['grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'grammar', 'sentence', 'write'];
   return { placement, th, start: { ...th }, n: { grammar: 0, sentence: 0 }, plan, i: 0, used: [], log: [], t0: Date.now() };
 }
 
@@ -295,18 +290,16 @@ export function nextTestItem(state, D, T) {
   if (step === 'grammar') return pick(state, fakeD, ['mcq'], 'grammar', used, { offset: 0 });
   if (step === 'sentence') return pick(state, fakeD, ['order', 'fix', 'tr'], 'sentence', used, { offset: 0 });
   if (step === 'write') return pick(state, fakeD, ['write'], 'writing', used, { offset: 0 });
-  if (step === 'speak') return pick(state, fakeD, ['speak'], 'speaking', used, { offset: 0 });
 }
 
 export function testRecord(T, item, score, ms, extra = {}) {
   T.used.push(item.id);
   T.log.push({ id: item.id, type: item.type, d: item.d, score, ms });
   const upd = (s, d, sc) => { const n = T.n[s] || 0; T.th[s] = Math.round(T.th[s] + kFor(n, true) * (sc - expected(T.th[s], d))); T.n[s] = n + 1; };
-  if (item.type === 'write' || item.type === 'speak') {
+  if (item.type === 'write') {
     // Avoimissa tehtävissä arvio tulee suoraan CEFR-tasosta (tekoäly tai itsearvio)
     if (extra.cefrRating) T.th[item.skill] = Math.round(0.25 * T.th[item.skill] + 0.75 * extra.cefrRating);
     else upd(item.skill, item.d, score);
-    if (extra.wpm != null) T.flu = [...(T.flu || []), clamp((extra.wpm - 60) / 70, 0, 1)];
     if (extra.wpmWriting != null) T.flu = [...(T.flu || []), clamp((extra.wpmWriting - 6) / 14, 0, 1)];
   } else {
     upd(item.skill, item.d, score);

@@ -102,17 +102,6 @@ ${EVAL_SCHEMA}`;
   return aiJSON(st, coach(ctx), user);
 }
 
-export async function evalSpeaking(st, ctx, item, transcript, seconds) {
-  const user = `Spoken task (given in Finnish): ${item.task}
-The other person said: "${item.prompt}"
-Learner's spoken answer, transcribed automatically by speech recognition (${Math.round(seconds)} s). Ignore punctuation, capitalisation and obvious transcription glitches; judge spoken grammar, vocabulary, structure, politeness and whether it answers the situation.
-"""${transcript}"""
-Return JSON:
-${EVAL_SCHEMA}
-In "improved" write what a fluent professional might naturally say, at a similar length.`;
-  return aiJSON(st, coach(ctx), user);
-}
-
 export async function checkShort(st, ctx, item, answer) {
   const what = item.type === 'tr' ? `Translate into English: "${item.fi}"` : `Correct the error(s) in: "${item.wrong}"`;
   const user = `Exercise: ${what}
